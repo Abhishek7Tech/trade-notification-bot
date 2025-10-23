@@ -2,14 +2,15 @@ import express from "express";
 import dotenv from "dotenv";
 import bot from "./bot/bot";
 import bodyParser = require("body-parser");
+import fetchTokenName from "./utils/getTokenNames";
 
 dotenv.config({ path: "./.env" });
 const port = process.env.PORT || 3000;
 const HELIUS_AUTH_TOKEN = process.env.HELIUS_AUTH_TOKEN!;
-
+const BOT_ID = process.env.BOT_CHAT_ID!;
 const app = express();
 app.use(bodyParser.json());
-app.post("/webhook", (req, res) => {
+app.post("/webhook",async (req, res) => {
   try {
     console.log("Webhook headers:", req.headers);
     const bearerToken = req.headers["authorization"]?.split(" ")[1];
@@ -27,9 +28,12 @@ app.post("/webhook", (req, res) => {
       const mintAddress = transfers.mint;
       const amount = transfers.tokenAmount;
 
-      // Send a message via telegram bot
-
-      // Save it in the database
+      const tokenName = await fetchTokenName(mintAddress);
+      
+      if(tokenName) {        
+          bot.sendMessage(BOT_ID, `Token Transfer Detected!\n\nToken: ${amount} ${tokenName.symbol}\n\nFrom: ${from}\n\nTo: ${to}\n\n Amount: ${amount}`);
+      }
+      
     }
 
     // Process the payload for Native Transfers
