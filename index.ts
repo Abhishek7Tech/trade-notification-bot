@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import bot from "./bot/bot";
 import bodyParser = require("body-parser");
 import fetchTokenName from "./utils/getTokenNames";
+import fetchTokenPrice from "./utils/getTokenPrices";
 
 dotenv.config({ path: "./.env" });
 const port = process.env.PORT || 3000;
@@ -10,7 +11,7 @@ const HELIUS_AUTH_TOKEN = process.env.HELIUS_AUTH_TOKEN!;
 const BOT_ID = process.env.BOT_CHAT_ID!;
 const app = express();
 app.use(bodyParser.json());
-app.post("/webhook",async (req, res) => {
+app.post("/webhook", async (req, res) => {
   try {
     console.log("Webhook headers:", req.headers);
     const bearerToken = req.headers["authorization"]?.split(" ")[1];
@@ -29,11 +30,18 @@ app.post("/webhook",async (req, res) => {
       const amount = transfers.tokenAmount;
 
       const tokenName = await fetchTokenName(mintAddress);
-      
-      if(tokenName) {        
-          bot.sendMessage(BOT_ID, `Token Transfer Detected!\n\nToken: ${amount} ${tokenName.symbol}\n\nFrom: ${from}\n\nTo: ${to}\n\n Amount: ${amount}`);
+      // USDC address
+      const tokenPrice = await fetchTokenPrice(
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      );
+      console.log("Token Price", tokenPrice, typeof tokenPrice);
+      const price = (tokenPrice * amount).toFixed(3);
+      if (tokenName) {
+        bot.sendMessage(
+          BOT_ID,
+          `Token Transfer Detected!\n\nToken: ${amount} ${tokenName.symbol}\n\nFrom: ${from}\n\nTo: ${to}\n\n Amount: ${price} USD`
+        );
       }
-      
     }
 
     // Process the payload for Native Transfers
