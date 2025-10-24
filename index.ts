@@ -7,6 +7,7 @@ import fetchTokenName from "./utils/getTokenNames";
 import fetchTokenPrice from "./utils/getTokenPrices";
 import fetchSolPrice from "./utils/getNativePrices";
 import Trade from "./model/tradeSchema";
+import getTransactionType from "./utils/getAccountAddress";
 
 dotenv.config({ path: "./.env" });
 
@@ -21,7 +22,7 @@ app.use(bodyParser.json());
 mongoose.connect(DB_CONNECTION_STRING).then(() => {
   console.log("Connected to MongoDB");
 });
-
+// console.log("HURRR");
 app.post("/webhook", async (req, res) => {
   try {
     console.log("Webhook headers:", req.headers);
@@ -32,6 +33,7 @@ app.post("/webhook", async (req, res) => {
       return res.status(401).send("Unauthorized");
     }
     console.log("Body", req.body);
+
     // Process the payload for Token Transfers
     if (req.body[0].tokenTransfers?.length === 1) {
       const transfers = req.body[0].tokenTransfers[0];
@@ -39,6 +41,13 @@ app.post("/webhook", async (req, res) => {
       const to = transfers.toUserAccount;
       const mintAddress = transfers.mint;
       const amount = transfers.tokenAmount;
+
+      const activity = await getTransactionType(from, to);
+
+      if (activity === "unknown" || !activity) {
+        bot.sendMessage(BOT_ID, `Failed to determin transaction type.`);
+        return res.status(400).send("Unknown transaction type");
+      }
 
       const tokenName = await fetchTokenName(mintAddress);
       // USDC address
@@ -58,7 +67,7 @@ app.post("/webhook", async (req, res) => {
           sender: from,
           receiver: to,
           price: price,
-          activity: "sent",
+          activity: activity,
         });
 
         console.log("Trade saved:", trade);
@@ -75,7 +84,12 @@ app.post("/webhook", async (req, res) => {
       const amount = transfers.amount;
       const solPrice = await fetchSolPrice("solana", "sol");
       const price = (solPrice * (amount / 1e9)).toFixed(3);
+      const activity = await getTransactionType(from, to);
 
+      if (activity === "unknown" || !activity) {
+        bot.sendMessage(BOT_ID, `Failed to determin transaction type.`);
+        return res.status(400).send("Unknown transaction type");
+      }
       // Send a message via telegram bot
       bot.sendMessage(
         BOT_ID,
@@ -83,15 +97,15 @@ app.post("/webhook", async (req, res) => {
           3
         )} SOL \n\nFrom: ${from}\n\nTo: ${to}\n\n Amount: ${price} USD`
       );
-       const trade = await Trade.create({
-          token: `${(amount / 1e9).toFixed(3)} SOL`,
-          sender: from,
-          receiver: to,
-          price: price,
-          activity: "sent",
-        });
+      const trade = await Trade.create({
+        token: `${(amount / 1e9).toFixed(3)} SOL`,
+        sender: from,
+        receiver: to,
+        price: price,
+        activity: activity,
+      });
 
-        console.log("Trade saved:", trade);
+      console.log("Trade saved:", trade);
       // Save it in the database
     }
 
