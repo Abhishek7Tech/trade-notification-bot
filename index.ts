@@ -1,17 +1,27 @@
 import express from "express";
 import dotenv from "dotenv";
+import mongoose from "mongoose";
 import bot from "./bot/bot";
 import bodyParser = require("body-parser");
 import fetchTokenName from "./utils/getTokenNames";
 import fetchTokenPrice from "./utils/getTokenPrices";
 import fetchSolPrice from "./utils/getNativePrices";
+import Trade from "./model/tradeSchema";
 
 dotenv.config({ path: "./.env" });
+
 const port = process.env.PORT || 3000;
 const HELIUS_AUTH_TOKEN = process.env.HELIUS_AUTH_TOKEN!;
 const BOT_ID = process.env.BOT_CHAT_ID!;
+const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING!;
+
 const app = express();
 app.use(bodyParser.json());
+
+mongoose.connect(DB_CONNECTION_STRING).then(() => {
+  console.log("Connected to MongoDB");
+});
+
 app.post("/webhook", async (req, res) => {
   try {
     console.log("Webhook headers:", req.headers);
@@ -42,6 +52,16 @@ app.post("/webhook", async (req, res) => {
           BOT_ID,
           `Token Transfer Detected!\n\nToken: ${amount} ${tokenName.symbol}\n\nFrom: ${from}\n\nTo: ${to}\n\n Amount: ${price} USD`
         );
+
+        const trade = await Trade.create({
+          token: `${amount} ${tokenName.symbol}`,
+          sender: from,
+          receiver: to,
+          price: price,
+          activity: "sent",
+        });
+
+        console.log("Trade saved:", trade);
       }
     }
 
@@ -57,9 +77,21 @@ app.post("/webhook", async (req, res) => {
       const price = (solPrice * (amount / 1e9)).toFixed(3);
 
       // Send a message via telegram bot
-      bot.sendMessage(BOT_ID, 
-          `SOL Transfer Detected!\n\nToken: ${(amount / 1e9).toFixed(3)} SOL \n\nFrom: ${from}\n\nTo: ${to}\n\n Amount: ${price} USD`
-      )
+      bot.sendMessage(
+        BOT_ID,
+        `SOL Transfer Detected!\n\nToken: ${(amount / 1e9).toFixed(
+          3
+        )} SOL \n\nFrom: ${from}\n\nTo: ${to}\n\n Amount: ${price} USD`
+      );
+       const trade = await Trade.create({
+          token: `${(amount / 1e9).toFixed(3)} SOL`,
+          sender: from,
+          receiver: to,
+          price: price,
+          activity: "sent",
+        });
+
+        console.log("Trade saved:", trade);
       // Save it in the database
     }
 
