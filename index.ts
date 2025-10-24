@@ -4,6 +4,7 @@ import bot from "./bot/bot";
 import bodyParser = require("body-parser");
 import fetchTokenName from "./utils/getTokenNames";
 import fetchTokenPrice from "./utils/getTokenPrices";
+import fetchSolPrice from "./utils/getNativePrices";
 
 dotenv.config({ path: "./.env" });
 const port = process.env.PORT || 3000;
@@ -46,14 +47,19 @@ app.post("/webhook", async (req, res) => {
 
     // Process the payload for Native Transfers
     if (req.body[0].nativeTransfers?.length === 1) {
+      console.log("NATIVE TRANSFER", req.body);
       const transfers = req.body[0].nativeTransfers[0];
       const from = transfers.fromUserAccount;
       const to = transfers.toUserAccount;
       // Divide by LAMPORTS_PER_SOL
       const amount = transfers.amount;
+      const solPrice = await fetchSolPrice("solana", "sol");
+      const price = (solPrice * (amount / 1e9)).toFixed(3);
 
       // Send a message via telegram bot
-
+      bot.sendMessage(BOT_ID, 
+          `SOL Transfer Detected!\n\nToken: ${(amount / 1e9).toFixed(3)} SOL \n\nFrom: ${from}\n\nTo: ${to}\n\n Amount: ${price} USD`
+      )
       // Save it in the database
     }
 
